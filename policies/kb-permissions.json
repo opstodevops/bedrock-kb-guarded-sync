@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "ReadSourceDocs", "Effect": "Allow", "Action": ["s3:GetObject", "s3:ListBucket"],
+     "Resource": ["arn:aws:s3:::${SOURCE_BUCKET}", "arn:aws:s3:::${SOURCE_BUCKET}/*",
+                  "arn:aws:s3:::${PREFIX}-restored-${ACCOUNT_ID}", "arn:aws:s3:::${PREFIX}-restored-${ACCOUNT_ID}/*"],
+     "Condition": {"StringEquals": {"aws:ResourceAccount": "${ACCOUNT_ID}"}}},
+    {"Sid": "EmbedChunks", "Effect": "Allow", "Action": "bedrock:InvokeModel",
+     "Resource": "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.titan-embed-text-v2:0"},
+    {"Sid": "WriteVectors", "Effect": "Allow",
+     "Action": ["s3vectors:PutVectors", "s3vectors:GetVectors", "s3vectors:DeleteVectors", "s3vectors:QueryVectors", "s3vectors:GetIndex"],
+     "Resource": "arn:aws:s3vectors:${AWS_REGION}:${ACCOUNT_ID}:bucket/${VECTOR_BUCKET}/index/*"}
+  ]
+}

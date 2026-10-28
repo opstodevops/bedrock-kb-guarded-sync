@@ -1,0 +1,8 @@
+{
+  "SelectionName": "${PREFIX}-kb-buckets",
+  "IamRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-backup-role",
+  "Resources": [
+    "arn:aws:s3:::${SOURCE_BUCKET}",
+    "arn:aws:s3:::${MANIFEST_BUCKET}"
+  ]
+}

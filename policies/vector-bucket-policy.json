@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "OnlyKnowledgeBaseWritesVectors",
+    "Effect": "Deny",
+    "Principal": "*",
+    "Action": ["s3vectors:PutVectors", "s3vectors:DeleteVectors", "s3vectors:DeleteIndex"],
+    "Resource": [
+      "arn:aws:s3vectors:${AWS_REGION}:${ACCOUNT_ID}:bucket/${VECTOR_BUCKET}",
+      "arn:aws:s3vectors:${AWS_REGION}:${ACCOUNT_ID}:bucket/${VECTOR_BUCKET}/index/*"
+    ],
+    "Condition": {"ArnNotEquals": {"aws:PrincipalArn": "arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-kb-role"}}
+  }]
+}

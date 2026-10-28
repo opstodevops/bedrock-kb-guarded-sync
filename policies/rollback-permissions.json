@@ -1,0 +1,9 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "RestoreSourceObjects",
+    "Effect": "Allow",
+    "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject"],
+    "Resource": "arn:aws:s3:::${SOURCE_BUCKET}/*"
+  }]
+}

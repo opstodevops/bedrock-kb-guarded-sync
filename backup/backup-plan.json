@@ -1,0 +1,14 @@
+{
+  "BackupPlanName": "${PREFIX}-kb-source-plan",
+  "Rules": [{
+    "RuleName": "continuous-pitr-35d",
+    "TargetBackupVaultName": "${PREFIX}-vault",
+    "ScheduleExpression": "cron(0 5 * * ? *)",
+    "EnableContinuousBackup": true,
+    "Lifecycle": {"DeleteAfterDays": 35},
+    "CopyActions": [{
+      "DestinationBackupVaultArn": "arn:aws:backup:${AWS_REGION}:${ACCOUNT_ID}:backup-vault:${PREFIX}-airgapped",
+      "Lifecycle": {"DeleteAfterDays": 35}
+    }]
+  }]
+}

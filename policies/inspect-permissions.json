@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "ReadSourceHistory", "Effect": "Allow", "Action": ["s3:ListBucket", "s3:ListBucketVersions"],
+     "Resource": "arn:aws:s3:::${SOURCE_BUCKET}"},
+    {"Sid": "ReadSourceObjects", "Effect": "Allow", "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+     "Resource": "arn:aws:s3:::${SOURCE_BUCKET}/*"},
+    {"Sid": "ListManifests", "Effect": "Allow", "Action": "s3:ListBucket",
+     "Resource": "arn:aws:s3:::${MANIFEST_BUCKET}"},
+    {"Sid": "ReadManifestsAndGolden", "Effect": "Allow", "Action": "s3:GetObject",
+     "Resource": ["arn:aws:s3:::${MANIFEST_BUCKET}/recovery-points/*", "arn:aws:s3:::${MANIFEST_BUCKET}/canary/*"]},
+    {"Sid": "WriteRecoveryPoints", "Effect": "Allow", "Action": "s3:PutObject",
+     "Resource": "arn:aws:s3:::${MANIFEST_BUCKET}/recovery-points/*"},
+    {"Sid": "KnowledgeBaseRead", "Effect": "Allow",
+     "Action": ["bedrock:GetKnowledgeBase", "bedrock:GetDataSource", "bedrock:GetIngestionJob", "bedrock:Retrieve", "bedrock:RetrieveAndGenerate"],
+     "Resource": "arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:knowledge-base/${KB_ID}"},
+    {"Sid": "ReadIndexConfig", "Effect": "Allow", "Action": "s3vectors:GetIndex",
+     "Resource": "arn:aws:s3vectors:${AWS_REGION}:${ACCOUNT_ID}:bucket/${VECTOR_BUCKET}/index/*"},
+    {"Sid": "InvokeClaudeViaGlobalProfiles", "Effect": "Allow", "Action": ["bedrock:InvokeModel", "bedrock:GetInferenceProfile"],
+     "Resource": [
+       "arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/global.${GEN_MODEL}",
+       "arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/global.${JUDGE_MODEL}"]},
+    {"Sid": "InvokeClaudeFoundationModels", "Effect": "Allow", "Action": "bedrock:InvokeModel",
+     "Resource": [
+       "arn:aws:bedrock:*::foundation-model/${GEN_MODEL}",
+       "arn:aws:bedrock:*::foundation-model/${JUDGE_MODEL}"],
+     "Condition": {"ArnLike": {"bedrock:InferenceProfileArn": "arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/global.*"}}}
+  ]
+}

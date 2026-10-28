@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "OnlyGuardedSyncChangesKnowledgeBase",
+    "Effect": "Deny",
+    "Action": [
+      "bedrock:StartIngestionJob",
+      "bedrock:IngestKnowledgeBaseDocuments",
+      "bedrock:DeleteKnowledgeBaseDocuments",
+      "bedrock:UpdateDataSource",
+      "bedrock:UpdateKnowledgeBase"
+    ],
+    "Resource": "arn:aws:bedrock:*:*:knowledge-base/*",
+    "Condition": {"ArnNotLike": {"aws:PrincipalArn": [
+      "arn:aws:iam::*:role/${PREFIX}-sfn-role",
+      "${BREAKGLASS_ROLE_ARN}"
+    ]}}
+  }]
+}

@@ -1,0 +1,26 @@
+# Previous proof of concept from another account (prebuilt zip, vendored SDK, resource notes)
+poc/build/
+poc/
+
+# Local build and test output
+build/
+*.zip
+sample-data/corpus/
+validation/
+out/
+tmp/
+.env
+*.pem
+*.log
+*.jsonl
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+__pycache__/
+*.pyc
+
+# draw.io backups
+*.drawio.bkp
+.$*.drawio*

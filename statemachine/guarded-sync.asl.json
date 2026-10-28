@@ -1,0 +1,140 @@
+{
+  "Comment": "Guarded sync for an Amazon Bedrock knowledge base: verify every ingestion, roll back on integrity failure",
+  "StartAt": "StartSync",
+  "States": {
+    "StartSync": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:bedrockagent:startIngestionJob",
+      "Parameters": {
+        "KnowledgeBaseId": "${KB_ID}",
+        "DataSourceId": "${DS_ID}",
+        "Description.$": "States.Format('guarded sync ({})', $.mode)"
+      },
+      "ResultSelector": {"jobId.$": "$.IngestionJob.IngestionJobId"},
+      "ResultPath": "$.sync",
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyHuman"}],
+      "Next": "WaitForSync"
+    },
+    "WaitForSync": {"Type": "Wait", "Seconds": 5, "Next": "GetSync"},
+    "GetSync": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:bedrockagent:getIngestionJob",
+      "Parameters": {
+        "KnowledgeBaseId": "${KB_ID}",
+        "DataSourceId": "${DS_ID}",
+        "IngestionJobId.$": "$.sync.jobId"
+      },
+      "ResultSelector": {
+        "jobId.$": "$.IngestionJob.IngestionJobId",
+        "status.$": "$.IngestionJob.Status",
+        "stats.$": "$.IngestionJob.Statistics"
+      },
+      "ResultPath": "$.sync",
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyHuman"}],
+      "Next": "SyncFinished?"
+    },
+    "SyncFinished?": {
+      "Type": "Choice",
+      "Choices": [
+        {"Variable": "$.sync.status", "StringEquals": "COMPLETE", "Next": "RunCanary"},
+        {"Or": [
+          {"Variable": "$.sync.status", "StringEquals": "FAILED"},
+          {"Variable": "$.sync.status", "StringEquals": "STOPPED"}
+        ], "Next": "NotifyHuman"}
+      ],
+      "Default": "WaitForSync"
+    },
+    "RunCanary": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "${INSPECT_FN_ARN}", "Payload": {"action": "canary"}},
+      "ResultSelector": {"r.$": "$.Payload"},
+      "ResultPath": "$.canary",
+      "Retry": [{"ErrorEquals": ["Lambda.TooManyRequestsException", "Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyHuman"}],
+      "Next": "RecordRecoveryPoint"
+    },
+    "RecordRecoveryPoint": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${INSPECT_FN_ARN}",
+        "Payload": {"action": "capture_manifest", "ingestionJobId.$": "$.sync.jobId", "canary.$": "$.canary.r"}
+      },
+      "ResultSelector": {"r.$": "$.Payload"},
+      "ResultPath": "$.recoveryPoint",
+      "Retry": [{"ErrorEquals": ["Lambda.TooManyRequestsException", "Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyHuman"}],
+      "Next": "Verified?"
+    },
+    "Verified?": {
+      "Type": "Choice",
+      "Choices": [
+        {"And": [
+          {"Variable": "$.recoveryPoint.r.status", "StringEquals": "GOOD"},
+          {"Variable": "$.mode", "StringEquals": "normal"}
+        ], "Next": "SyncVerified"},
+        {"And": [
+          {"Variable": "$.recoveryPoint.r.status", "StringEquals": "GOOD"},
+          {"Variable": "$.mode", "StringEquals": "rollback"}
+        ], "Next": "NotifyRecovered"},
+        {"Variable": "$.mode", "StringEquals": "rollback", "Next": "NotifyHuman"}
+      ],
+      "Default": "Triage"
+    },
+    "Triage": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "${INSPECT_FN_ARN}", "Payload": {"action": "triage", "canary.$": "$.canary.r"}},
+      "ResultSelector": {"r.$": "$.Payload"},
+      "ResultPath": "$.triage",
+      "Retry": [{"ErrorEquals": ["Lambda.TooManyRequestsException", "Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyHuman"}],
+      "Next": "Rollback"
+    },
+    "Rollback": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "${ROLLBACK_FN_ARN}", "Payload": {"action": "rollback", "triage.$": "$.triage.r"}},
+      "ResultSelector": {"r.$": "$.Payload"},
+      "ResultPath": "$.rollback",
+      "Retry": [{"ErrorEquals": ["Lambda.TooManyRequestsException", "Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyHuman"}],
+      "Next": "EnterRollbackMode"
+    },
+    "EnterRollbackMode": {"Type": "Pass", "Result": "rollback", "ResultPath": "$.mode", "Next": "StartSync"},
+    "NotifyRecovered": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${TOPIC_ARN}",
+        "Subject": "Knowledge base rolled back to a known-good recovery point",
+        "Message": {
+          "knowledgeBaseId": "${KB_ID}",
+          "execution.$": "$$.Execution.Id",
+          "recoveryPoint.$": "$.recoveryPoint.r.manifestKey",
+          "restoredFrom.$": "$.triage.r.goodRecoveryPoint",
+          "rolledBack.$": "$.rollback.r.actions",
+          "kept.$": "$.triage.r.kept",
+          "analysis.$": "$.triage.r.summary"
+        }
+      },
+      "ResultPath": null,
+      "Next": "RecoveredAndVerified"
+    },
+    "NotifyHuman": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${TOPIC_ARN}",
+        "Subject": "ACTION REQUIRED: knowledge base integrity not restored",
+        "Message": {"knowledgeBaseId": "${KB_ID}", "execution.$": "$$.Execution.Id", "state.$": "$"}
+      },
+      "ResultPath": null,
+      "Next": "NeedsHuman"
+    },
+    "SyncVerified": {"Type": "Succeed"},
+    "RecoveredAndVerified": {"Type": "Succeed"},
+    "NeedsHuman": {"Type": "Fail", "Error": "IntegrityNotRestored", "Cause": "Canary failing after rollback, sync failed, or a guard task errored"}
+  }
+}

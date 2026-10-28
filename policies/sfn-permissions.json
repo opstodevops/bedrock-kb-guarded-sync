@@ -1,0 +1,10 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "OwnIngestion", "Effect": "Allow", "Action": ["bedrock:StartIngestionJob", "bedrock:GetIngestionJob"],
+     "Resource": "arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:knowledge-base/${KB_ID}"},
+    {"Sid": "InvokeGuards", "Effect": "Allow", "Action": "lambda:InvokeFunction",
+     "Resource": ["${INSPECT_FN_ARN}", "${ROLLBACK_FN_ARN}"]},
+    {"Sid": "Alert", "Effect": "Allow", "Action": "sns:Publish", "Resource": "${TOPIC_ARN}"}
+  ]
+}

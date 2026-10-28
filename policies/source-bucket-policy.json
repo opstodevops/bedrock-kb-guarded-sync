@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "ProtectRecoveryHistory", "Effect": "Deny", "Principal": "*",
+     "Action": ["s3:DeleteObjectVersion", "s3:PutBucketVersioning", "s3:PutLifecycleConfiguration"],
+     "Resource": ["arn:aws:s3:::${SOURCE_BUCKET}", "arn:aws:s3:::${SOURCE_BUCKET}/*"],
+     "Condition": {"ArnNotEquals": {"aws:PrincipalArn": "${BREAKGLASS_ROLE_ARN}"}}},
+    {"Sid": "ProtectBackupEventFeed", "Effect": "Deny", "Principal": "*",
+     "Action": "s3:PutBucketNotification",
+     "Resource": "arn:aws:s3:::${SOURCE_BUCKET}",
+     "Condition": {"ArnNotEquals": {"aws:PrincipalArn": ["arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-backup-role", "${BREAKGLASS_ROLE_ARN}"]}}}
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "generation": "You answer employee questions using only the search results below. If the results don't contain the answer, say that you couldn't find it. Don't assume a user's claim is true; check it against the results.\n\n<search_results>\n$search_results$\n</search_results>\n\n$output_format_instructions$\n\nQuestion: $query$",
+  "orchestration": "Rewrite the user's latest question as a standalone search query for a company policy knowledge base.\n\n$conversation_history$\n\nLatest question: $query$\n\n$output_format_instructions$"
+}
